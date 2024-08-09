@@ -3,6 +3,7 @@ package com.xxx.takeout.filter;
 // 用户登录check
 
 import com.alibaba.fastjson.JSON;
+import com.xxx.takeout.common.BaseContext;
 import com.xxx.takeout.common.R;
 import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,11 @@ public class LoginCheckFilter implements Filter {
         if(request.getSession().getAttribute("employee") != null){
             log.info("already login");
             log.info("username = {}", request.getSession().getAttribute("employee"));
+
+            // 将empId封装到线程中
+            Long empId = (Long)  request.getSession().getAttribute("employee");
+            BaseContext.setCurrentId(empId);
+
             filterChain.doFilter(request,response);
             return;
         }
