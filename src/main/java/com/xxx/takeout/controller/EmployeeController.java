@@ -102,4 +102,19 @@ public class EmployeeController {
 
         return R.success(pageInfo);
     }
+
+    // 更改员工信息(根据ID)
+    @PutMapping
+    public R<String> update(HttpServletRequest request,@RequestBody Employee employee){
+        log.info("更改员工信息：{}", employee.toString());
+
+        long empId = (Long) request.getSession().getAttribute("employee");
+        employee.setUpdateTime(LocalDateTime.now());
+        employee.setUpdateUser(empId);
+
+        // 根据 employee 对象中的 id 字段，在数据库中查找对应的记录。
+        // 更新：将该记录的字段更新为 employee 对象中的新值。仅更新不为 null 的字段，其他字段保持不变（这依赖于 MyBatis-Plus 的默认行为或配置）。
+        employeeService.updateById(employee);
+        return R.success("success changed");
+    }
 }
