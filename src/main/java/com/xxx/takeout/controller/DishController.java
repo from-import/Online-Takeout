@@ -42,6 +42,15 @@ public class DishController {
         return R.success("新增菜品成功");
     }
 
+    // 修改菜品
+    @PutMapping
+    public R<String> update(@RequestBody DishDto dishDto){
+        log.info("更新菜品{}", dishDto.toString()); // 双表更新
+
+        dishService.updateWithFlavor(dishDto); // 写入SQL数据库
+        return R.success("新增菜品成功");
+    }
+
     // 菜品展示界面
     @GetMapping("/page")
     public R<Page> page(int page, int pageSize, String name){
@@ -54,7 +63,7 @@ public class DishController {
         // 过滤条件
         queryWrapper.like(name != null, Dish::getName,name);
         // 排序条件
-        queryWrapper.orderByAsc(Dish::getUpdateTime);
+        queryWrapper.orderByAsc(Dish::getUpdateTime );
 
         // 将pageInfo 和 queryWrapper 传进 dishService
         dishService.page(pageInfo, queryWrapper);
@@ -74,5 +83,15 @@ public class DishController {
 
         dishDtoPage.setRecords(list);
         return R.success(dishDtoPage);
+    }
+
+    /**
+     * 根据ID查询菜品属性 和 口味信息
+     */
+    @GetMapping("/{id}")
+    public R<DishDto> get(@PathVariable Long id){
+        // 双表查询 需要在 DishService 实现方法
+        DishDto dishDto = dishService.getByIdWithFlavor(id);
+        return R.success(dishDto);
     }
 }
