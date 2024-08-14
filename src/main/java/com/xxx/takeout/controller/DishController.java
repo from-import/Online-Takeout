@@ -94,4 +94,27 @@ public class DishController {
         DishDto dishDto = dishService.getByIdWithFlavor(id);
         return R.success(dishDto);
     }
+
+
+    /**
+     * 根据条件查询对应菜品数据
+     */
+    @GetMapping("/list")
+    public R<List<Dish>> list(Dish dish){
+        // 构造条件构造器
+        LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
+
+        // 添加查询条件
+        queryWrapper.eq(dish.getCategoryId() != null, Dish::getCategoryId, dish.getCategoryId());
+        queryWrapper.eq(dish.getIsDeleted() != null, Dish::getIsDeleted, dish.getIsDeleted());
+        queryWrapper.eq(Dish::getStatus,1); // status == 1
+
+        // 添加排序条件
+        queryWrapper.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
+
+        List<Dish> list = dishService.list(queryWrapper);
+        return R.success(list);
+
+
+    }
 }
