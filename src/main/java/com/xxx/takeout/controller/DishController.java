@@ -6,6 +6,7 @@ import com.xxx.takeout.common.R;
 import com.xxx.takeout.dto.DishDto;
 import com.xxx.takeout.entity.Category;
 import com.xxx.takeout.entity.Dish;
+import com.xxx.takeout.entity.DishFlavor;
 import com.xxx.takeout.service.CategoryService;
 import com.xxx.takeout.service.DishFlavorService;
 import com.xxx.takeout.service.DishService;
@@ -100,6 +101,48 @@ public class DishController {
      * 根据条件查询对应菜品数据
      */
     @GetMapping("/list")
+    public R<List<DishDto>> list(DishDto dish){
+        // 构造条件构造器
+        LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
+
+        // 添加查询条件
+        queryWrapper.eq(dish.getCategoryId() != null, Dish::getCategoryId, dish.getCategoryId());
+        queryWrapper.eq(dish.getIsDeleted() != null, Dish::getIsDeleted, dish.getIsDeleted());
+        queryWrapper.eq(Dish::getStatus,1); // status == 1
+
+        // 添加排序条件
+        queryWrapper.orderByAsc(Dish::getSort).orderByDesc(Dish::getUpdateTime);
+
+        List<Dish> list = dishService.list(queryWrapper);
+
+        List<DishDto> dishDtos = list.stream().map((item) -> {
+            DishDto dishDto = new DishDto();
+            BeanUtils.copyProperties(item, dishDto);  // 将item的普通属性 copy to dishDto
+            Long categoryId = item.getCategoryId();  // 菜品分类的ID
+            Category category = categoryService.getById(categoryId);  // 根据菜品分类的ID获取的菜品分类对象
+            String categoryName = category.getName();  // 菜品分类名称
+            dishDto.setCategoryName(categoryName);  // 设置菜品分类名称
+
+            // 当前菜品的ID
+            Long dishID = item.getId();
+            LambdaQueryWrapper<DishFlavor> flavorQueryWrapper = new LambdaQueryWrapper<>();
+            flavorQueryWrapper.eq(DishFlavor::getDishId, dishID);
+
+            // 菜品对应的口味
+            List<DishFlavor> flavors = dishFlavorService.list(flavorQueryWrapper);
+
+            // 最终SQL: SELECT * FROM dish_flavor WHERE dish_id = dishID
+            dishDto.setFlavors(flavors);  // 设置菜品对应的口味数据
+            return dishDto;
+        }).collect(Collectors.toList());
+
+        return R.success(dishDtos);
+    }
+
+
+
+    /*
+        @GetMapping("/list")
     public R<List<Dish>> list(Dish dish){
         // 构造条件构造器
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
@@ -114,7 +157,6 @@ public class DishController {
 
         List<Dish> list = dishService.list(queryWrapper);
         return R.success(list);
-
-
     }
+     */
 }
