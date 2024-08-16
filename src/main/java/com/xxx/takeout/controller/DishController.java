@@ -13,10 +13,12 @@ import com.xxx.takeout.service.DishService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 // 菜品管理
@@ -34,6 +36,9 @@ public class DishController {
     @Autowired
     private CategoryService categoryService;
 
+    @Autowired
+    private RedisTemplate redisTemplate; // Redis
+
     // 新增菜品
     @PostMapping
     public R<String> save(@RequestBody DishDto dishDto){
@@ -47,8 +52,15 @@ public class DishController {
     @PutMapping
     public R<String> update(@RequestBody DishDto dishDto){
         log.info("更新菜品{}", dishDto.toString()); // 双表更新
-
         dishService.updateWithFlavor(dishDto); // 写入SQL数据库
+//        // 清除所有菜品在Redis中的缓存数据
+//        redisTemplate.keys("dish_*").forEach((key) -> {
+//            redisTemplate.delete(key);
+//        });
+
+        // 精确清理菜品缓存
+        String key = "dish_" + dishDto.getCategoryId() + "_" + dishDto.getStatus();
+        redisTemplate.delete(key);
         return R.success("新增菜品成功");
     }
 
@@ -102,6 +114,17 @@ public class DishController {
      */
     @GetMapping("/list")
     public R<List<DishDto>> list(DishDto dish){
+        List<DishDto> dishDtoList = null;
+        String key = "dish_" + dish.getCategoryId() + "_" + dish.getStatus(); // dish_5455547554_1
+        // 首先尝试从Redis中获取数据
+        dishDtoList = (List<DishDto>) redisTemplate.opsForValue().get(key);
+
+        // 如果获取到，直接返回数据
+        if (dishDtoList != null){
+            return R.success(dishDtoList);
+        }
+
+        // 若不存在，进入正常读取逻辑，然后添加到Redis
         // 构造条件构造器
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
 
@@ -136,6 +159,8 @@ public class DishController {
             return dishDto;
         }).collect(Collectors.toList());
 
+        // 缓存到 Redis 数据库
+        redisTemplate.opsForValue().set(key, dishDtos,2, TimeUnit.HOURS);
         return R.success(dishDtos);
     }
 
