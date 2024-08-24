@@ -1,13 +1,16 @@
 package com.xxx.takeout.common;
 
 import lombok.Data;
+
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 @Data
-public class R<T> {
-    // 反馈给前端的对象
+public class R<T> implements Serializable {
+    // Serializable 实现序列化接口
 
+    // 反馈给前端的对象
     private Integer code; //编码：1成功，0和其它数字为失败
 
     private String msg; //错误信息

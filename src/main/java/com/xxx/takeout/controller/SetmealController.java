@@ -12,8 +12,11 @@ import com.xxx.takeout.service.CategoryService;
 import com.xxx.takeout.service.SetmealDishService;
 import com.xxx.takeout.service.SetmealService;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.experimental.categories.Category;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +42,7 @@ public class SetmealController {
      * @return
      */
     @PostMapping
+    @CacheEvict(value = "setmealCache",allEntries = true)
     public R<String> save(@RequestBody SetmealDto setmealDto){
         log.info("套餐添加信息: {}", setmealDto);
         setmealService.saveWithDish(setmealDto);
@@ -86,8 +90,10 @@ public class SetmealController {
 
     /**
      * 批量删除套餐
+     * allEntries: 清除全部缓存数据
      */
     @DeleteMapping
+    @CacheEvict(value = "setmealCache",allEntries = true)
     public R<String> delete(@RequestParam List<Long> ids){
         log.info("删除套餐{}", ids);
         setmealService.removeWithDish(ids);
@@ -122,7 +128,9 @@ public class SetmealController {
      * @return
      */
     @GetMapping
+    @Cacheable(value = "setmealCache", key = "#setmeal.categoryId + '_' + #setmeal.status")
     public R<List<Setmeal>> list(Setmeal setmeal){
+        // 使用注解实现Redis自动缓存
         LambdaQueryWrapper<Setmeal> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(setmeal.getCategoryId() != null, Setmeal::getCategoryId, setmeal.getCategoryId());
         wrapper.eq(setmeal.getStatus() != null, Setmeal::getStatus, setmeal.getStatus());
