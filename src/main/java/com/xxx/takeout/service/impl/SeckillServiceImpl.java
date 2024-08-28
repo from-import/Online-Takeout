@@ -74,7 +74,6 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillGoodsMapper, SeckillG
      *                而是在多个redis实例创建锁（0.5 * N + 1)，只有大部分的redis实例创建锁成功，才算成功。
      *                这种设计可以保证Redis主从一致性，但是有性能问题
      *                非要保证强一致性，可以采用Zookeeper
-     *
      */
     @Override
     public boolean executeSeckill(Long userId, Long goodsId) {
