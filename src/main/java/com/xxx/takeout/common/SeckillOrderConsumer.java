@@ -7,14 +7,18 @@ import com.xxx.takeout.entity.SeckillUser;
 import com.xxx.takeout.mapper.SeckillGoodsMapper;
 import com.xxx.takeout.mapper.SeckillOrderMapper;
 import com.xxx.takeout.mapper.SeckillUserMapper;
+import com.rabbitmq.client.Channel;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class SeckillOrderConsumer {
@@ -30,9 +34,16 @@ public class SeckillOrderConsumer {
     @Autowired
     private SeckillUserMapper seckillUserMapper;
 
-    @RabbitListener(queues = RabbitMQConfig.SECKILL_QUEUE)
-    public void handleSeckillOrder(String orderInfo) {
+    @RabbitListener(queues = RabbitMQConfig.SECKILL_QUEUE, ackMode = "MANUAL")
+    public void handleSeckillOrder(String orderInfo, Channel channel, Message message) {
         try {
+            // 检查投递次数
+            if (getDeliveryCount(message) > 3) {
+                logger.warn("消息已超过3次重复投递，将转移到死信队列: {}", orderInfo);
+                channel.basicReject(message.getMessageProperties().getDeliveryTag(), false);
+                return;
+            }
+
             // 解析订单信息
             logger.info("接收到秒杀订单: {}", orderInfo);
 
@@ -63,8 +74,18 @@ public class SeckillOrderConsumer {
 
             logger.info("订单信息已保存到数据库: userId={}, goodsId={}", userId, goodsId);
 
+            // 手动确认消息已成功处理
+            channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+
         } catch (Exception e) {
             logger.error("Error processing order: {}", orderInfo, e);
+
+            try {
+                // 当消息处理失败时，重新投递到队列
+                channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true);
+            } catch (IOException ioException) {
+                logger.error("Error while sending nack for message: {}", orderInfo, ioException);
+            }
         }
     }
 
@@ -80,6 +101,25 @@ public class SeckillOrderConsumer {
             }
         } catch (Exception e) {
             logger.error("Error updating stock in database for goodsId={}", goodsId, e);
+            throw e; // 抛出异常以触发 nack
         }
+    }
+
+    /**
+     * 获取消息的投递次数
+     * @param message 消息
+     * @return 投递次数
+     */
+    private int getDeliveryCount(Message message) {
+        Map<String, Object> headers = message.getMessageProperties().getHeaders();
+        if (headers.containsKey("x-death")) {
+            List<Map<String, ?>> deaths = (List<Map<String, ?>>) headers.get("x-death");
+            if (deaths.size() > 0) {
+                Map<String, ?> death = deaths.get(0);
+                Long count = (Long) death.get("count");
+                return count.intValue();
+            }
+        }
+        return 0;
     }
 }

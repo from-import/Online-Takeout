@@ -78,6 +78,7 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillGoodsMapper, SeckillG
     @Override
     public boolean executeSeckill(Long userId, Long goodsId) {
         String seckillLockKey = "seckill:lock:" + goodsId + ":" + userId;
+        // 锁实现方式是基于用户和商品的组合键来创建锁的，这种方式有效避免了对其他用户的秒杀操作造成堵塞。
         RLock seckillLock = redissonClient.getLock(seckillLockKey);
         try {
             // 加锁，防止并发问题，使用看门狗机制

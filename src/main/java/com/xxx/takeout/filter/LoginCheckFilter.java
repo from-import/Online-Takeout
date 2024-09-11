@@ -56,6 +56,7 @@ public class LoginCheckFilter implements Filter {
                 "/common/**",
                 "/user/sendMsg",
                 "/user/login",
+                "/seckill/execute"
         };
 
         // 判断本次请求是否需要处理
