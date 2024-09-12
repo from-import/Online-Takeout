@@ -8,13 +8,16 @@ import com.xxx.takeout.common.CustomException;
 import com.xxx.takeout.entity.*;
 import com.xxx.takeout.mapper.OrderMapper;
 import com.xxx.takeout.service.*;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Orders> implement
 
     @Autowired
     private AddressBookService addressBookService; // 获取用户地址
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;  // 注入 RabbitTemplate 对象
 
     @Autowired
     private OrderDetailService orderDetailService; // 插入订单详情数据
@@ -102,5 +108,52 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Orders> implement
 
         // 8. 清空购物车
         shoppingCartService.remove(queryWrapper);
+
+        // 将订单ID发送到订单超时队列
+        // 死信队列用于处理超时的订单
+        // 将订单ID发送到超时队列，初始TTL为10秒
+        rabbitTemplate.convertAndSend("orderTimeoutExchange", "orderTimeoutRoutingKey", orderId,
+                message -> {
+                    message.getMessageProperties().setExpiration("10000");  // 第一个超时设定为10秒
+                    return message;
+                }
+        );
+        // 初始化订单的超时索引
+        updateTimeoutIndex(orderId, 1);
+        System.out.println("订单提交成功，并已发送到订单超时队列，订单ID：" + orders.getId());
+
     }
+
+    // 删除超时订单的方法
+    @Override
+    public void removeOrderById(Long orderId) {
+        // 1. 删除订单详情记录
+        LambdaQueryWrapper<OrderDetail> detailWrapper = new LambdaQueryWrapper<>();
+        detailWrapper.eq(OrderDetail::getOrderId, orderId);
+        orderDetailService.remove(detailWrapper);
+
+        // 2. 删除订单记录
+        this.removeById(orderId);
+        System.out.println("订单及订单详情删除成功，订单ID: " + orderId);
+    }
+
+    @Override
+    public boolean isOrderPaid(Long orderId) {
+        Orders order = this.getById(orderId);
+        return order != null && order.getStatus() == 1;  // 假设订单状态1表示已支付
+    }
+
+    // 模拟订单的超时检查索引存储，你可以将其存储在数据库中
+    private Map<Long, Integer> orderTimeoutIndex = new HashMap<>();
+
+    @Override
+    public int getCurrentTimeoutIndex(Long orderId) {
+        return orderTimeoutIndex.getOrDefault(orderId, 0);  // 获取订单当前的超时检查索引，默认从0开始
+    }
+
+    @Override
+    public void updateTimeoutIndex(Long orderId, int index) {
+        orderTimeoutIndex.put(orderId, index);  // 更新订单的超时检查索引
+    }
+
 }
