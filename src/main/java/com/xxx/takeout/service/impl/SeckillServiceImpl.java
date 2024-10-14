@@ -121,7 +121,10 @@ public class SeckillServiceImpl extends ServiceImpl<SeckillGoodsMapper, SeckillG
                 }
             }
 
-            // 使用 Lua 脚本实现库存原子性扣减和用户秒杀记录的操作
+            //  使用 Lua 脚本实现库存原子性扣减和用户秒杀记录的操作
+            //  Lua 脚本是在 Redis 内部执行，Redis 的单线程机制确保了脚本的执行是原子操作。
+            //  在执行库存检查和扣减时，其他请求不会中途打断或干扰这个过程。
+            //  因此，即使两个用户几乎同时发起秒杀请求，也只有一个用户能够成功扣减库存，另一个用户会由于库存不足而秒杀失败。
             String luaScript = "local stock = tonumber(redis.call('get', KEYS[1])) " +
                     "if not stock or stock <= 0 then return 0 end " +  // 库存不足
                     "if redis.call('exists', KEYS[2]) == 1 then return -1 end " +  // 已经秒杀过

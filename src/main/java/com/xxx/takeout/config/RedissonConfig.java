@@ -18,3 +18,19 @@ public class RedissonConfig {
         return Redisson.create(config);
     }
 }
+
+/**
+ * public class RedissonConfig {
+ *
+ *     public RedissonClient redissonClient() {
+ *         Config config = new Config();
+ *
+ *         // 配置为集群模式
+ *         config.useClusterServers()
+ *               .addNodeAddress("redis://127.0.0.1:7000", "redis://127.0.0.1:7001")
+ *               .setPassword("yourPassword");  // 如果有密码，添加密码
+ *
+ *         return Redisson.create(config);
+ *     }
+ * }
+ */
